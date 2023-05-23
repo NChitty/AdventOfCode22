@@ -1,0 +1,3 @@
+[submodule "calorie-counting"]
+	path = calorie-counting
+	url = git@github.com:NChitty/calorie-counting.git
