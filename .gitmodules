@@ -1,3 +1,6 @@
 [submodule "calorie-counting"]
 	path = calorie-counting
 	url = git@github.com:NChitty/calorie-counting.git
+[submodule "encoded-rps"]
+	path = encoded-rps
+	url = git@github.com:NChitty/encoded-rps.git
