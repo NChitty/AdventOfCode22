@@ -12,7 +12,7 @@ impl CleaningAssignment {
         let mut b: Option<CleaningAssignment> = None;
         for str in ranges {
             let nums: Vec<&str> = str.split('-').collect();
-            let low = nums.get(0).expect("Index not found").parse().expect("Not a number.");
+            let low = nums.first().expect("Index not found").parse().expect("Not a number.");
             let high = nums.get(1).expect("Index not found").parse().expect("Not a number.");
             if a.is_none() {
                 a = Option::Some(CleaningAssignment {

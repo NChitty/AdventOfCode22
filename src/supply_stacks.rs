@@ -47,9 +47,9 @@ impl Command {
         };
 
         Command {
-            count: (&captured_cmd["count"]).parse().expect("NaN"),
-            from: (&captured_cmd["from_stack"]).parse().expect("NaN"), 
-            to: (&captured_cmd["to_stack"]).parse().expect("NaN"),
+            count: (captured_cmd["count"]).parse().expect("NaN"),
+            from: (captured_cmd["from_stack"]).parse().expect("NaN"),
+            to: (captured_cmd["to_stack"]).parse().expect("NaN"),
         }
     }
 
@@ -106,10 +106,7 @@ fn cargo_mover9000(input: &(Vec<Vec<char>>, Vec<Command>)) -> String {
     let mut top_crates = String::new();
 
     for stack in stacks.iter() {
-        match stack.last() {
-            Some(top) => top_crates.push(*top),
-            None => (),
-        }
+        if let Some(top) = stack.last() { top_crates.push(*top) }
     }
 
     top_crates
@@ -131,10 +128,7 @@ fn cargo_mover9001(input: &(Vec<Vec<char>>, Vec<Command>)) -> String {
     let mut top_crates = String::new();
 
     for stack in stacks.iter() {
-        match stack.last() {
-            Some(top) => top_crates.push(*top),
-            None => (),
-        }
+        if let Some(top) = stack.last() { top_crates.push(*top) }
     }
 
     top_crates
