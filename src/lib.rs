@@ -15,6 +15,7 @@ pub mod camp_cleanup;
 pub mod supply_stacks;
 // day 6
 pub mod tuning_trouble;
+//day 7
 pub mod no_space;
 
-aoc_lib!{ year = 2022 }
+aoc_lib! { year = 2022 }
