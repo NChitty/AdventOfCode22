@@ -17,5 +17,7 @@ pub mod supply_stacks;
 pub mod tuning_trouble;
 //day 7
 pub mod no_space;
+//day 8
+pub mod treetop_tree_house;
 
 aoc_lib! { year = 2022 }
