@@ -44,7 +44,7 @@ fn start_ofmessage(input: &Vec<char>) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::tuning_trouble::*;
+    use crate::day6::*;
 
     #[test]
     fn unique_true() {

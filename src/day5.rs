@@ -138,8 +138,8 @@ fn cargo_mover9001(input: &(Vec<Vec<char>>, Vec<Command>)) -> String {
 mod test {
     use std::assert_eq;
 
-    use crate::supply_stacks::Command;
-    use crate::supply_stacks::*;
+    use crate::day5::Command;
+    use crate::day5::*;
 
     #[test] 
     fn command_from_str() {

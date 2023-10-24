@@ -205,7 +205,7 @@ fn _highest_scenic_score(p0: &ForestMap) -> usize {
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
-    use crate::treetop_tree_house::{_highest_scenic_score, count_visible, ForestMap};
+    use crate::day8::{_highest_scenic_score, count_visible, ForestMap};
 
     const EXAMPLE: &str = "30373
 25512
