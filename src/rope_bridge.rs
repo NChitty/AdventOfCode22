@@ -125,62 +125,58 @@ pub(crate) fn to_movements(input: &str) -> Vec<Movement> {
 
 #[aoc(day9, part1)]
 fn do_movements(input: &[Movement]) -> usize {
-    let mut head = Head::new();
-    let mut tail = Knot::new();
-    let mut vec = Vec::from(input);
+    let mut movements = Vec::from(input);
+    let mut knots = build_rope(2);
 
-    vec.iter_mut().for_each(|movement| {
+    iter_moves(&mut movements, &mut knots).len()
+}
+
+fn iter_moves<'a>(movements: &'a mut [Movement], knots: &'a mut Vec<Knot>) -> &'a HashSet<(isize, isize)> {
+    movements.iter_mut().for_each(|movement| {
         while movement.get_amount() > 0 {
-            head.do_move(&tail, movement);
-            tail.do_move(&head, movement);
+            do_move(knots, movement)
         }
     });
 
-    tail.visited.len()
+    &knots.last().unwrap().visited
+}
+
+fn build_rope(num_knots: usize) -> Vec<Knot> {
+    let mut knots = Vec::new();
+    (0..num_knots).for_each(|_| {
+        knots.push(Knot::new());
+    });
+
+    knots
+}
+
+fn do_move(knots: &mut Vec<Knot>, movement: &mut Movement) {
+    knots.first_mut().unwrap().move_as_head(movement);
+    for i in 0..knots.len() - 1 {
+        move_follower(knots, i);
+    }
+}
+
+fn move_follower(knots: &mut Vec<Knot>, parent_idx: usize) {
+    let binding = knots.clone();
+    let parent = binding.get(parent_idx).unwrap();
+    knots.get_mut(parent_idx + 1)
+        .unwrap()
+        .move_as_follower(parent);
 }
 
 #[aoc(day9, part2)]
-fn do_movements_vector(input: &[Movement]) -> usize {
-    let dc = Head::new();
-    let mut dcm = Movement::UP(0);
-    let mut head = Head::new();
-    let mut knots = vec![
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-        Knot::new(),
-    ];
-    let mut vec = Vec::from(input);
+fn do_movements_long(input: &[Movement]) -> usize {
+    let mut movements = Vec::from(input);
+    let mut knots = build_rope(10);
 
-    vec.iter_mut().for_each(|movement| {
-        while movement.get_amount() > 0 {
-            let mut sentinel = true;
-            let immut_knots = knots.clone();
-            head.do_move(&dc, movement);
-            let mut prev = immut_knots.first().unwrap();
-            for item in knots.iter_mut() {
-                if sentinel {
-                    sentinel = false;
-                    item.do_move(&head, &mut dcm);
-                } else {
-                    item.do_move(prev, &mut dcm);
-                }
-                prev = item;
-            }
-        }
-    });
-
-    knots.last().unwrap().visited.len()
+    iter_moves(&mut movements, &mut knots).len()
 }
 
 #[cfg(test)]
 mod test {
-    use crate::rope_bridge::{do_movements, do_movements_vector, Head, Knot, Movable, Movement, Position, to_movements};
+    use std::collections::HashSet;
+    use crate::rope_bridge::{build_rope, do_movements, do_movements_long, iter_moves, Knot, Movement, to_movements};
 
     const EXAMPLE: &str = "R 4
 U 4
@@ -216,69 +212,69 @@ U 20";
 
     #[test]
     fn test_head_move_up() {
-        let dc = Head::new();
-        let mut head = Head::new();
+        let mut head = Knot::new();
         let mut movement = Movement::UP(1);
 
-        head.do_move(&dc, &mut movement);
+        head.move_as_head(&mut movement);
 
         assert_eq!(Movement::UP(0), movement);
-        assert_eq!(Position::from(0, 1), head.pos);
+        assert_eq!((0, 1), head.pos);
     }
 
     #[test]
     fn test_head_move_down() {
-        let dc = Head::new();
-        let mut head = Head::new();
+        let mut head = Knot::new();
         let mut movement = Movement::DOWN(1);
 
-        head.do_move(&dc, &mut movement);
+        head.move_as_head(&mut movement);
 
         assert_eq!(Movement::DOWN(0), movement);
-        assert_eq!(Position::from(0, -1), head.pos);
+        assert_eq!((0, -1), head.pos);
     }
 
     #[test]
     fn test_head_move_right() {
-        let dc = Head::new();
-        let mut head = Head::new();
+        let mut head = Knot::new();
         let mut movement = Movement::RIGHT(1);
 
-        head.do_move(&dc, &mut movement);
+        head.move_as_head(&mut movement);
 
         assert_eq!(Movement::RIGHT(0), movement);
-        assert_eq!(Position::from(1, 0), head.pos);
+        assert_eq!((1, 0), head.pos);
     }
 
     #[test]
     fn test_head_move_left() {
-        let dc = Head::new();
-        let mut head = Head::new();
+        let mut head = Knot::new();
         let mut movement = Movement::LEFT(1);
 
-        head.do_move(&dc, &mut movement);
+        head.move_as_head(&mut movement);
 
         assert_eq!(Movement::LEFT(0), movement);
-        assert_eq!(Position::from(-1, 0), head.pos);
+        assert_eq!((-1, 0), head.pos);
     }
 
     #[test]
-    fn test_tail_move_logic_basic() {
-        let mut movement = Movement::RIGHT(2);
-        let mut head = Head::new();
-        let mut tail = Knot::new();
-        head.do_move(&tail, &mut movement);
-        tail.do_move(&head, &mut movement);
+    fn test_cmp_set_p1() {
+        let mut cmp_set: HashSet<(isize, isize)> = HashSet::new();
+        cmp_set.insert((0, 0));
+        cmp_set.insert((1, 0));
+        cmp_set.insert((2, 0));
+        cmp_set.insert((3, 0));
+        cmp_set.insert((4, 1));
+        cmp_set.insert((4, 2));
+        cmp_set.insert((3, 2));
+        cmp_set.insert((2, 2));
+        cmp_set.insert((1, 2));
+        cmp_set.insert((4, 3));
+        cmp_set.insert((3, 3));
+        cmp_set.insert((3, 4));
+        cmp_set.insert((2, 4));
+        let mut movement_list = to_movements(EXAMPLE);
+        let mut knots = build_rope(2);
+        let tail_pos = iter_moves(&mut movement_list, &mut knots);
 
-        assert_eq!(Position::new(), tail.pos);
-        assert_eq!(Position::from(1, 0), head.pos);
-
-        head.do_move(&tail, &mut movement);
-        tail.do_move(&head, &mut movement);
-
-        assert_eq!(Position::from(1, 0), tail.pos);
-        assert_eq!(Position::from(2, 0), head.pos);
-        assert_eq!(Movement::RIGHT(0), movement);
+        assert_eq!(cmp_set, *tail_pos);
     }
 
     #[test]
@@ -288,14 +284,62 @@ U 20";
     }
 
     #[test]
-    fn test_sample_v1_vector() {
+    fn test_sample_p1_long() {
         let movement_list = to_movements(EXAMPLE);
-        assert_eq!(1, do_movements_vector(movement_list.as_slice()));
+        assert_eq!(1, do_movements_long(movement_list.as_slice()));
+    }
+
+    #[test]
+    fn test_cmp_set_p2() {
+        let mut cmp_set: HashSet<(isize, isize)> = HashSet::new();
+        cmp_set.insert((0, 0));
+        cmp_set.insert((1, 1));
+        cmp_set.insert((2, 2));
+        cmp_set.insert((1, 3));
+        cmp_set.insert((2, 4));
+        cmp_set.insert((3, 5));
+        cmp_set.insert((4, 5));
+        cmp_set.insert((5, 5));
+        cmp_set.insert((6, 4));
+        cmp_set.insert((7, 3));
+        cmp_set.insert((8, 2));
+        cmp_set.insert((9, 1));
+        cmp_set.insert((10, 0));
+        cmp_set.insert((9, -1));
+        cmp_set.insert((8, -2));
+        cmp_set.insert((7, -3));
+        cmp_set.insert((6, -4));
+        cmp_set.insert((5, -5));
+        cmp_set.insert((4, -5));
+        cmp_set.insert((3, -5));
+        cmp_set.insert((2, -5));
+        cmp_set.insert((1, -5));
+        cmp_set.insert((0, -5));
+        cmp_set.insert((-1, -5));
+        cmp_set.insert((-2, -5));
+        cmp_set.insert((-3, -4));
+        cmp_set.insert((-4, -3));
+        cmp_set.insert((-5, -2));
+        cmp_set.insert((-6, -1));
+        cmp_set.insert((-7, 0));
+        cmp_set.insert((-8, 1));
+        cmp_set.insert((-9, 2));
+        cmp_set.insert((-10, 3));
+        cmp_set.insert((-11, 4));
+        cmp_set.insert((-11, 5));
+        cmp_set.insert((-11, 6));
+
+        let mut movement_list = to_movements(EXAMPLE_P2);
+        let mut knots = build_rope(10);
+        let tail_pos = iter_moves(&mut movement_list, &mut knots);
+
+        let _ = dbg!(cmp_set.difference(tail_pos));
+        assert_eq!(cmp_set, *tail_pos);
     }
 
     #[test]
     fn test_sample_p2() {
         let movement_list = to_movements(EXAMPLE_P2);
-        assert_eq!(36, do_movements_vector(movement_list.as_slice()));
+        assert_eq!(36, do_movements_long(movement_list.as_slice()));
     }
 }
