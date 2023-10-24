@@ -156,7 +156,7 @@ impl ForestMap {
         }
     }
 
-    fn print_visible(&self) {
+    fn _print_visible(&self) {
         let vec_idx = |col: usize, row: usize| col + row * self.num_cols;
 
         for col in 0..self.num_cols {
