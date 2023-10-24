@@ -176,7 +176,7 @@ fn do_movements_long(input: &[Movement]) -> usize {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
-    use crate::rope_bridge::{build_rope, do_movements, do_movements_long, iter_moves, Knot, Movement, to_movements};
+    use crate::day9::{build_rope, do_movements, do_movements_long, iter_moves, Knot, Movement, to_movements};
 
     const EXAMPLE: &str = "R 4
 U 4

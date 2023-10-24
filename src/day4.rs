@@ -67,7 +67,7 @@ fn count_partially_overlapped(input: &[(CleaningAssignment, CleaningAssignment)]
 
 #[cfg(test)]
 mod tests {
-    use crate::camp_cleanup::CleaningAssignment;
+    use crate::day4::CleaningAssignment;
 
     #[test]
     fn cleaning_assignment_from_str() {
