@@ -15,9 +15,11 @@ pub mod camp_cleanup;
 pub mod supply_stacks;
 // day 6
 pub mod tuning_trouble;
-//day 7
+// day 7
 pub mod no_space;
-//day 8
+// day 8
 pub mod treetop_tree_house;
+// day 9
+pub mod rope_bridge;
 
 aoc_lib! { year = 2022 }
