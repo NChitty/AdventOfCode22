@@ -1,5 +1,4 @@
-use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
 
@@ -9,11 +8,6 @@ pub enum Movement {
     DOWN(usize),
     LEFT(usize),
     RIGHT(usize),
-}
-
-trait Movable {
-    fn do_move(&mut self, parent: &impl Movable, movement: &mut Movement);
-    fn get_position(&self) -> Position;
 }
 
 impl Movement {
@@ -27,141 +21,70 @@ impl Movement {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Head {
-    pos: Position,
-}
-
-impl Head {
-    fn new() -> Head {
-        Head {
-            pos: Position::new()
-        }
-    }
-}
-
-impl Movable for Head {
-    fn do_move(&mut self, _: &impl Movable, movement: &mut Movement) {
-        match movement {
-            Movement::UP(amount) if *amount > 0 => {
-                self.pos.y += 1;
-                *amount -= 1;
-            }
-            Movement::DOWN(amount) if *amount > 0 => {
-                self.pos.y -= 1;
-                *amount -= 1;
-            }
-            Movement::LEFT(amount) if *amount > 0 => {
-                self.pos.x -= 1;
-                *amount -= 1;
-            }
-            Movement::RIGHT(amount) if *amount > 0 => {
-                self.pos.x += 1;
-                *amount -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    fn get_position(&self) -> Position {
-        self.pos
-    }
-}
-
 #[derive(Clone)]
 struct Knot {
-    pos: Position,
-    visited: HashSet<Position>,
+    pos: (isize, isize),
+    visited: HashSet<(isize, isize)>,
 }
 
 impl Knot {
     fn new() -> Knot {
         Knot {
-            pos: Position::new(),
+            pos: (0, 0),
             visited: HashSet::new(),
         }
     }
-}
 
-impl Movable for Knot {
-    fn do_move(&mut self, parent: &impl Movable, _: &mut Movement) {
-        let head_pos = parent.get_position();
-        let diff_pos = head_pos.sub(&self.pos);
-        match diff_pos {
-            Position { x: 0, y: 0 } => {}
-            Position { x, y } if x.abs() == 1 && y.abs() == 1 => {}
-            Position { x: 0, y } if y.abs() > 1 => {
-                self.pos.y = match y.cmp(&0) {
-                    Ordering::Less => self.pos.y + y + 1,
-                    Ordering::Equal => self.pos.y + y,
-                    Ordering::Greater => self.pos.y + y - 1,
-                }
+    fn move_as_head(&mut self, movement: &mut Movement) {
+        match movement {
+            Movement::UP(amount) if *amount > 0 => {
+                self.pos.1 += 1;
+                *amount -= 1;
             }
-            Position { x, y: 0 } if x.abs() > 1 => {
-                self.pos.x = match x.cmp(&0) {
-                    Ordering::Less => self.pos.x + x + 1,
-                    Ordering::Equal => self.pos.x + x,
-                    Ordering::Greater => self.pos.x + x - 1,
-                }
+            Movement::DOWN(amount) if *amount > 0 => {
+                self.pos.1 -= 1;
+                *amount -= 1;
             }
-            Position { x, y } if x.abs() >= 1 && y.abs() >= 1 => {
-                let offset_pos = match (x.cmp(&0), y.cmp(&0), x.abs() > y.abs()) {
-                    (Ordering::Less, Ordering::Less, false) => Position::from(0, 1),
-                    (Ordering::Less, Ordering::Less, true) => Position::from(1, 0),
-                    (Ordering::Greater, Ordering::Less, false) => Position::from(0, 1),
-                    (Ordering::Greater, Ordering::Less, true) => Position::from(-1, 0),
-                    (Ordering::Less, Ordering::Greater, false) => Position::from(0, -1),
-                    (Ordering::Less, Ordering::Greater, true) => Position::from(1, 0),
-                    (Ordering::Greater, Ordering::Greater, false) => Position::from(0, -1),
-                    (Ordering::Greater, Ordering::Greater, true) => Position::from(-1, 0),
-                    (_, _, _) => panic!("Offset")
-                };
-                self.pos.add(diff_pos);
-                self.pos.add(offset_pos);
+            Movement::LEFT(amount) if *amount > 0 => {
+                self.pos.0 -= 1;
+                *amount -= 1;
+            }
+            Movement::RIGHT(amount) if *amount > 0 => {
+                self.pos.0 += 1;
+                *amount -= 1;
             }
             _ => {}
+        }
+    }
+
+    fn move_as_follower(&mut self, parent: &Knot) {
+        let diff_pos =
+            (parent.get_position().0 - self.pos.0, parent.get_position().1 - self.pos.1);
+        match diff_pos {
+            (x, y) if x.abs() > 1 => {
+                if y.abs() == 1 {
+                    self.pos.0 += x / 2;
+                    self.pos.1 += y;
+                } else {
+                    self.pos.0 += x / 2;
+                }
+            }
+            (x, y) if y.abs() > 1 => {
+                if x.abs() == 1 {
+                    self.pos.0 += x;
+                    self.pos.1 += y / 2;
+                } else {
+                    self.pos.1 += y / 2;
+                }
+            }
+            (_, _) => {}
         }
 
         self.visited.insert(self.pos);
     }
 
-    fn get_position(&self) -> Position {
-        self.pos
-    }
-}
-
-
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-struct Position {
-    x: isize,
-    y: isize,
-}
-
-impl Position {
-    fn new() -> Self {
-        Position {
-            x: 0,
-            y: 0,
-        }
-    }
-
-    fn from(x: isize, y: isize) -> Self {
-        Position {
-            x,
-            y,
-        }
-    }
-
-    fn add(&mut self, rhs: Self) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-    }
-
-    fn sub(&self, rhs: &Self) -> Self {
-        Position {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-        }
+    fn get_position(&self) -> &(isize, isize) {
+        &self.pos
     }
 }
 
