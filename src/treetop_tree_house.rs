@@ -1,4 +1,3 @@
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -98,10 +97,6 @@ impl ForestMap {
 
     fn get_left_indices(&self, location: (usize, usize)) -> Vec<usize> {
         (self.num_cols * (location.1)..(location.0 + location.1 * self.num_cols)).rev().collect()
-    }
-
-    fn get_tree(&self, location: (usize, usize)) -> &Tree {
-        self.trees.get(location.0 + location.1 * self.num_cols).unwrap()
     }
 
     fn set_scenic_scores(&mut self)
