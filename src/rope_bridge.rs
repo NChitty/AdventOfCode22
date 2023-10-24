@@ -157,8 +157,8 @@ fn do_move(knots: &mut Vec<Knot>, movement: &mut Movement) {
     }
 }
 
-fn move_follower(knots: &mut Vec<Knot>, parent_idx: usize) {
-    let binding = knots.clone();
+fn move_follower(knots: &mut [Knot], parent_idx: usize) {
+    let binding = knots.to_owned();
     let parent = binding.get(parent_idx).unwrap();
     knots.get_mut(parent_idx + 1)
         .unwrap()

@@ -218,7 +218,7 @@ mod test {
         let mut map = ForestMap::from_str(EXAMPLE).expect("Parse error");
 
         map.set_scenic_scores();
-        map.print_visible();
+        map._print_visible();
 
         dbg!(&map);
         assert_eq!(21, count_visible(&map));
