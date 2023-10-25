@@ -61,21 +61,23 @@ impl Knot {
         let diff_pos =
             (parent.get_position().0 - self.pos.0, parent.get_position().1 - self.pos.1);
         match diff_pos {
-            (x, y) if x.abs() > 1 => {
-                if y.abs() == 1 {
-                    self.pos.0 += x / 2;
-                    self.pos.1 += y;
-                } else {
-                    self.pos.0 += x / 2;
-                }
+            (x, y) if x.abs() > 1 && y == 0 => {
+                self.pos.0 += x / 2;
             }
-            (x, y) if y.abs() > 1 => {
-                if x.abs() == 1 {
-                    self.pos.0 += x;
-                    self.pos.1 += y / 2;
-                } else {
-                    self.pos.1 += y / 2;
-                }
+            (x, y) if y.abs() > 1 && x == 0 => {
+                self.pos.1 += y / 2;
+            },
+            (x, y) if x.abs() > 1 && y.abs() == 1 => {
+                self.pos.0 += x / 2;
+                self.pos.1 += y;
+            },
+            (x, y) if x.abs() == 1 && y.abs() > 1 => {
+                self.pos.0 += x;
+                self.pos.1 += y / 2;
+            }
+            (x, y) if x.abs() > 1 && y.abs() > 1 => {
+                self.pos.0 += x / 2;
+                self.pos.1 += y / 2;
             }
             (_, _) => {}
         }
@@ -134,7 +136,7 @@ fn do_movements(input: &[Movement]) -> usize {
 fn iter_moves<'a>(movements: &'a mut [Movement], knots: &'a mut Vec<Knot>) -> &'a HashSet<(isize, isize)> {
     movements.iter_mut().for_each(|movement| {
         while movement.get_amount() > 0 {
-            do_move(knots, movement)
+            do_move(knots, movement);
         }
     });
 
@@ -341,5 +343,14 @@ U 20";
     fn test_sample_p2() {
         let movement_list = to_movements(EXAMPLE_P2);
         assert_eq!(36, do_movements_long(movement_list.as_slice()));
+    }
+
+    #[test]
+    fn test_special() {
+        let mut movement_list = to_movements("R 5\nU 8");
+        let mut knots = build_rope(10);
+        iter_moves(&mut movement_list, &mut knots);
+
+        assert_eq!((0, 0), knots.last().unwrap().pos);
     }
 }
