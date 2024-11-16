@@ -1,6 +1,6 @@
 use core::panic;
+use std::option::Option::{None, Some};
 use std::{collections::VecDeque, u8, usize};
-use std::option::Option::{Some, None};
 
 type Position = (usize, usize);
 
@@ -24,15 +24,6 @@ impl Directions {
             Directions::DOWN => (1, 0),
             Directions::LEFT => (0, -1),
             Directions::RIGHT => (0, 1),
-        }
-    }
-
-    fn character(&self) -> char {
-        match self {
-            Directions::UP => '^',
-            Directions::DOWN => 'v',
-            Directions::LEFT => '<',
-            Directions::RIGHT => '>',
         }
     }
 
@@ -137,6 +128,42 @@ fn bfs(
     }
 }
 
+fn bfs_to_a(graph: &[Node], start: Position, distances: &mut Vec<usize>) -> usize {
+    let (rows, cols) = graph.last().expect("Graph is empty.").position;
+    distances[get_index(start, cols)] = 0;
+    let mut visited: VecDeque<Node> = VecDeque::new();
+    visited.push_back(graph[get_index(start, cols)].clone());
+    while !visited.is_empty() {
+        let cur_node = visited.pop_front().expect("No node to pop");
+        if cur_node.height == 0 || cur_node.height == 1 {
+            return distances[get_index(cur_node.position, cols)];
+        }
+        let dist = distances.clone();
+        Directions::directions()
+            .iter()
+            .map(|direction| direction.delta())
+            .filter(filter_bounds(&cur_node, &rows, &cols))
+            .map(|delta| {
+                (
+                    cur_node.position.0.saturating_add_signed(delta.0),
+                    cur_node.position.1.saturating_add_signed(delta.1),
+                )
+            })
+            .filter(|position| dist[get_index(*position, cols)] == usize::MAX)
+            .map(|position| graph[position.0 * (cols + 1) + position.1].clone())
+            .filter(|node| {
+                let overflow = cur_node.height.overflowing_sub(node.height);
+                overflow.0 <= 1 || overflow.1
+            })
+            .for_each(|node| {
+                visited.push_back(node.clone());
+                distances[get_index(node.position, cols)] =
+                    distances[get_index(cur_node.position, cols)] + 1;
+            });
+    }
+    usize::MAX
+}
+
 #[aoc_generator(day12)]
 fn parse_input(input: &str) -> Vec<Node> {
     input
@@ -166,18 +193,22 @@ fn shortest_path(graph: &[Node]) -> usize {
     path.push_back(get_index(end_pos, cols));
     let mut cur_node = get_index(end_pos, cols);
     while !parents[cur_node].is_none() {
-        println!("Current Node: {cur_node}");
         path.push_back(get_index(parents[cur_node].expect("No parent node"), cols));
         cur_node = get_index(parents[cur_node].expect("No parent node"), cols);
     }
     path.len() - 1
 }
 
+#[aoc(day12, part2)]
+fn shortest_path_to_a(graph: &[Node]) -> usize {
+    let (rows, cols) = graph.last().expect("Graph is empty.").position;
+    let mut distances = vec![usize::MAX; (rows + 1) * (cols + 1)];
+    bfs_to_a(&graph, find_end(&graph), &mut distances)
+}
+
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-
-    use crate::day12::{bfs, find_end, find_start, get_index, shortest_path, Position};
+    use crate::day12::{find_end, find_start, shortest_path, shortest_path_to_a, Position};
 
     use super::{parse_input, to_height, Node};
     const SAMPLE_MAP: &str = "Sabqponm
@@ -252,6 +283,14 @@ cdE";
         let expected = 31;
         let nodes = parse_input(SAMPLE_MAP);
         let actual = shortest_path(&nodes);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn sample_shortest_path_to_a() {
+        let expected = 29;
+        let nodes = parse_input(SAMPLE_MAP);
+        let actual = shortest_path_to_a(&nodes);
         assert_eq!(expected, actual);
     }
 }
