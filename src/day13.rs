@@ -65,7 +65,6 @@ impl FromStr for PacketData {
         while let Some((i, char)) = chars.next() {
             match char {
                 ']' => {
-                    depth -= 0;
                     break;
                 }
                 '[' => {
