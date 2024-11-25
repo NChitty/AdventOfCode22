@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, str::FromStr, usize};
+use std::{collections::HashMap, str::FromStr, usize};
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 struct Valve {
@@ -90,24 +90,37 @@ fn fill_matrix(
     for k in map.keys() {
         for i in map.keys() {
             for j in map.keys() {
-                let distance = adjacency_matrix.entry((i.to_string(), j.to_string()));
-                let intermediate_first = adjacency_matrix.entry((i.to_string(), k.to_string()));
-                let intermediate_second = adjacency_matrix.entry((k.to_string(), j.to_string()));
+                if i != j {
+                    let dist_i_j = adjacency_matrix
+                        .get(&(i.to_string(), k.to_string()))
+                        .unwrap_or(&usize::MAX)
+                        .clone();
+                    let dist_j_k = adjacency_matrix
+                        .get(&(k.to_string(), j.to_string()))
+                        .unwrap_or(&usize::MAX)
+                        .clone();
+                    adjacency_matrix
+                        .entry((i.to_string(), j.to_string()))
+                        .and_modify(|e| *e = (*e).min(dist_i_j.saturating_add(dist_j_k)))
+                        .or_insert(usize::MAX);
+                }
             }
         }
     }
 }
 
-fn brute_search(state: &State, map: &HashMap<String, Valve>) -> usize {
+fn brute_search(
+    state: &State,
+    map: &HashMap<String, Valve>,
+    adjacency_matrix: &HashMap<(String, String), usize>,
+) -> usize {
     let mut stack = Vec::new();
     let mut max_released = 0;
 
     stack.push(state.clone());
     while let Some(mut current_state) = stack.pop() {
-        current_state.minutes_remaining -= 1;
-        current_state.released += current_state.current_rate;
-
         if current_state.minutes_remaining == 0 {
+            println!("State expired: {}, max: {}", current_state.opened.join(", "), current_state.released);
             max_released = max_released.max(current_state.released);
             continue;
         }
@@ -119,6 +132,9 @@ fn brute_search(state: &State, map: &HashMap<String, Valve>) -> usize {
                 .rate
                 != 0
         {
+            current_state.minutes_remaining -= 1;
+            current_state.released += current_state.current_rate;
+
             let mut opened_state = current_state.clone();
             opened_state
                 .opened
@@ -130,13 +146,27 @@ fn brute_search(state: &State, map: &HashMap<String, Valve>) -> usize {
             stack.push(opened_state);
         }
 
-        if let Some(adjacent) = map.get(&current_state.current_valve) {
-            for valve in &adjacent.adjacent {
+        adjacency_matrix
+            .keys()
+            .filter(|(valve, to)| {
+                *valve == current_state.current_valve
+                    && map.get(to).expect("Could not find destination valve").rate > 0
+                    && !current_state.opened.contains(to)
+                    && current_state.minutes_remaining.saturating_sub(
+                        *adjacency_matrix
+                            .get(&(valve.to_string(), to.to_string()))
+                            .expect("No entry"),
+                    ) > 1
+            })
+            .for_each(|entry| {
                 let mut next_state = current_state.clone();
-                next_state.current_valve = valve.clone();
+                next_state.minutes_remaining -=
+                    adjacency_matrix.get(entry).expect("Could not find entry");
+                next_state.released += next_state.current_rate
+                    * adjacency_matrix.get(entry).expect("Could not find entry");
+                next_state.current_valve = entry.1.clone();
                 stack.push(next_state);
-            }
-        }
+            });
     }
     max_released
 }
@@ -150,17 +180,19 @@ fn parse_valves(input: &str) -> HashMap<String, Valve> {
         .collect()
 }
 
-#[aoc(day16, part1, BruteForce)]
-fn part1_brute_force(input: &HashMap<String, Valve>) -> usize {
+#[aoc(day16, part1)]
+fn part1_greedy(input: &HashMap<String, Valve>) -> usize {
     let state = State::default();
-    brute_search(&state, &input)
+    let mut adjacency_matrix = initial_adjacency_matrix(&input);
+    fill_matrix(&input, &mut adjacency_matrix);
+    brute_search(&state, &input, &adjacency_matrix)
 }
 
 #[cfg(test)]
 mod test {
-    use crate::day16::part1_brute_force;
+    use crate::day16::part1_greedy;
 
-    use super::{parse_valves, Valve};
+    use super::{fill_matrix, initial_adjacency_matrix, parse_valves, Valve};
 
     const SAMPLE_INPUT: &str = "Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
 Valve BB has flow rate=13; tunnels lead to valves CC, AA
@@ -191,9 +223,9 @@ Valve JJ has flow rate=21; tunnel leads to valve II";
 
     #[test]
     fn sample_brute() {
-        let input = parse_valves(SAMPLE_INPUT);
-        let expected = 1651;
-        let actual = part1_brute_force(&input);
-        assert_eq!(expected, actual);
+      let map = parse_valves(SAMPLE_INPUT);
+      let expected = 1651;
+      let actual = part1_greedy(&map);
+      assert_eq!(expected, actual);
     }
 }
