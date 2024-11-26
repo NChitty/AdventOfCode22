@@ -245,9 +245,44 @@ fn part1_branch_and_bound(input: &(Vec<usize>, Vec<Vec<u8>>, Vec<usize>, usize))
     best
 }
 
+#[aoc(day16, part2)]
+fn part2_branch_and_bound(input: &(Vec<usize>, Vec<Vec<u8>>, Vec<usize>, usize)) -> usize {
+    let mut best_per_visited = vec![0; u16::MAX as usize];
+    branch_and_bound(
+        &input.0,
+        &input.2,
+        &input.1,
+        State::new(input.3, 26),
+        &mut best_per_visited,
+        &mut 0,
+        |bound, best| bound > best * 1 / 4,
+    );
+    let best_per_visited_filtered_sorted = best_per_visited
+        .into_iter()
+        .enumerate()
+        .filter(|&(_, best)| best > 0)
+        .map(|(i, best)| (i as u16, best))
+        .sorted_unstable_by_key(|&(_, best)| Reverse(best))
+        .collect_vec();
+    let mut best = 0;
+    for (i, &(my_visited, my_best)) in best_per_visited_filtered_sorted.iter().enumerate() {
+        for &(elephant_visited, elephant_best) in &best_per_visited_filtered_sorted[i + 1..] {
+            let score = my_best + elephant_best;
+            if score <= best {
+                break;
+            }
+            if my_visited & elephant_visited == 0 {
+                best = score;
+                break;
+            }
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod test {
-    use crate::day16::part1_branch_and_bound;
+    use crate::day16::{part1_branch_and_bound, part2_branch_and_bound};
 
     use super::{parse_valves, Valve};
 
@@ -283,6 +318,14 @@ Valve JJ has flow rate=21; tunnel leads to valve II";
         let map = parse_valves(SAMPLE_INPUT);
         let expected = 1651;
         let actual = part1_branch_and_bound(&map);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn sample_part2() {
+        let map = parse_valves(SAMPLE_INPUT);
+        let expected = 1707;
+        let actual = part2_branch_and_bound(&map);
         assert_eq!(expected, actual);
     }
 }
