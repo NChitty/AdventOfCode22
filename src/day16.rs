@@ -1,31 +1,17 @@
-use std::{collections::HashMap, str::FromStr, usize};
+use std::{
+    cmp::Reverse,
+    collections::{HashMap, HashSet},
+    str::FromStr,
+    usize,
+};
+
+use itertools::Itertools;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 struct Valve {
     name: String,
     rate: usize,
     adjacent: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-struct State {
-    current_valve: String,
-    minutes_remaining: usize,
-    current_rate: usize,
-    released: usize,
-    opened: Vec<String>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            current_valve: "AA".to_string(),
-            minutes_remaining: 30,
-            current_rate: 0,
-            released: 0,
-            opened: Vec::new(),
-        }
-    }
 }
 
 impl FromStr for Valve {
@@ -73,126 +59,197 @@ impl FromStr for Valve {
     }
 }
 
-fn initial_adjacency_matrix(map: &HashMap<String, Valve>) -> HashMap<(String, String), usize> {
-    let mut adjacency_matrix = HashMap::new();
-    map.keys().for_each(|key| {
-        map[key].adjacent.iter().for_each(|adjacent_valve| {
-            adjacency_matrix.insert((key.clone(), adjacent_valve.clone()), 1);
-        })
-    });
-    adjacency_matrix
+#[derive(Clone, Copy, Debug)]
+struct State {
+    current_valve: usize,
+    minutes_remaining: usize,
+    pressure_released: usize,
+    avoid: usize,
+    visited: usize,
 }
 
-fn fill_matrix(
-    map: &HashMap<String, Valve>,
-    adjacency_matrix: &mut HashMap<(String, String), usize>,
-) {
-    for k in map.keys() {
-        for i in map.keys() {
-            for j in map.keys() {
-                if i != j {
-                    let dist_i_j = adjacency_matrix
-                        .get(&(i.to_string(), k.to_string()))
-                        .unwrap_or(&usize::MAX)
-                        .clone();
-                    let dist_j_k = adjacency_matrix
-                        .get(&(k.to_string(), j.to_string()))
-                        .unwrap_or(&usize::MAX)
-                        .clone();
-                    adjacency_matrix
-                        .entry((i.to_string(), j.to_string()))
-                        .and_modify(|e| *e = (*e).min(dist_i_j.saturating_add(dist_j_k)))
-                        .or_insert(usize::MAX);
+impl State {
+    fn new(position: usize, minutes_remaing: usize) -> Self {
+        Self {
+            current_valve: position,
+            minutes_remaining: minutes_remaing,
+            pressure_released: 0,
+            avoid: 1 << position,
+            visited: 0,
+        }
+    }
+
+    fn can_visit(&self, valve_idx: usize) -> bool {
+        (self.visited | self.avoid) & (1 << valve_idx) == 0
+    }
+
+    fn bound(self, flow_rates: &[usize], sorted_flow_rate_indices: &[usize]) -> usize {
+        self.pressure_released
+            + (0..=self.minutes_remaining)
+                .rev()
+                .step_by(2)
+                .skip(1)
+                .zip(
+                    sorted_flow_rate_indices
+                        .iter()
+                        .filter(|&&i| self.can_visit(i))
+                        .map(|&i| flow_rates[i]),
+                )
+                .map(|(minutes, flow)| minutes * flow)
+                .sum::<usize>()
+    }
+
+    fn branch<'a>(
+        self,
+        flow_rates: &'a Vec<usize>,
+        shortest_path_lengths: &'a Vec<Vec<u8>>,
+    ) -> impl IntoIterator<Item = Self> + 'a {
+        shortest_path_lengths[self.current_valve]
+            .iter()
+            .enumerate()
+            .filter(move |&(destination, _distance)| self.can_visit(destination))
+            .filter_map(move |(destination, distance)| {
+                let minutes_remaining =
+                    self.minutes_remaining.checked_sub(*distance as usize + 1)?;
+                Some(State {
+                    visited: self.visited | (1 << destination),
+                    avoid: self.avoid,
+                    pressure_released: self.pressure_released
+                        + minutes_remaining * flow_rates[destination],
+                    minutes_remaining,
+                    current_valve: destination,
+                })
+            })
+    }
+}
+
+fn floyd_warshall(valves: &[Valve]) -> Vec<Vec<u8>> {
+    let valve_name_to_idx: HashMap<String, _> = valves
+        .iter()
+        .enumerate()
+        .map(|(i, ref valve)| (valve.name.to_owned(), i))
+        .collect();
+    let mut dist: Vec<Vec<u8>> = vec![vec![u8::MAX; valves.len()]; valves.len()];
+    for (i, valve) in valves.iter().enumerate() {
+        for tunnel in valve.adjacent.clone() {
+            let j = valve_name_to_idx[&tunnel];
+            dist[i][j] = 1;
+        }
+    }
+    (0..valves.len()).for_each(|i| {
+        dist[i][i] = 0;
+    });
+    for k in 0..dist.len() {
+        for i in 0..dist.len() {
+            for j in 0..dist.len() {
+                let (result, overflow) = dist[i][k].overflowing_add(dist[k][j]);
+                if !overflow {
+                    dist[i][j] = dist[i][j].min(result);
                 }
             }
         }
     }
+    dist
 }
 
-fn brute_search(
-    state: &State,
-    map: &HashMap<String, Valve>,
-    adjacency_matrix: &HashMap<(String, String), usize>,
-) -> usize {
-    let mut stack = Vec::new();
-    let mut max_released = 0;
-
-    stack.push(state.clone());
-    while let Some(mut current_state) = stack.pop() {
-        if current_state.minutes_remaining == 0 {
-            println!("State expired: {}, max: {}", current_state.opened.join(", "), current_state.released);
-            max_released = max_released.max(current_state.released);
-            continue;
-        }
-
-        if !current_state.opened.contains(&current_state.current_valve)
-            && map
-                .get(&current_state.current_valve)
-                .expect("Could not find current_valve")
-                .rate
-                != 0
-        {
-            current_state.minutes_remaining -= 1;
-            current_state.released += current_state.current_rate;
-
-            let mut opened_state = current_state.clone();
-            opened_state
-                .opened
-                .push(current_state.current_valve.clone());
-            opened_state.current_rate += map
-                .get(&current_state.current_valve)
-                .expect("Could not find current_valve")
-                .rate;
-            stack.push(opened_state);
-        }
-
-        adjacency_matrix
-            .keys()
-            .filter(|(valve, to)| {
-                *valve == current_state.current_valve
-                    && map.get(to).expect("Could not find destination valve").rate > 0
-                    && !current_state.opened.contains(to)
-                    && current_state.minutes_remaining.saturating_sub(
-                        *adjacency_matrix
-                            .get(&(valve.to_string(), to.to_string()))
-                            .expect("No entry"),
-                    ) > 1
-            })
-            .for_each(|entry| {
-                let mut next_state = current_state.clone();
-                next_state.minutes_remaining -=
-                    adjacency_matrix.get(entry).expect("Could not find entry");
-                next_state.released += next_state.current_rate
-                    * adjacency_matrix.get(entry).expect("Could not find entry");
-                next_state.current_valve = entry.1.clone();
-                stack.push(next_state);
-            });
+fn branch_and_bound(
+    flow_rates: &Vec<usize>,
+    sorted_flow_rate_indices: &[usize],
+    shortest_path_lengths: &Vec<Vec<u8>>,
+    state: State,
+    best_for_visited: &mut [usize],
+    best: &mut usize,
+    filter_bound: impl Fn(usize, usize) -> bool + Copy,
+) {
+    if let Some(cur_best) = best_for_visited.get_mut(state.visited) {
+        *cur_best = state.pressure_released.max(*cur_best);
     }
-    max_released
+    *best = state.pressure_released.max(*best);
+    let bound_branch_pairs = state
+        .branch(flow_rates, shortest_path_lengths)
+        .into_iter()
+        .map(|state| (state.bound(flow_rates, sorted_flow_rate_indices), state))
+        .filter(|&(bound, _)| filter_bound(bound, *best))
+        .sorted_unstable_by_key(|(bound, _)| Reverse(*bound))
+        .collect_vec();
+    for (bound, branch) in bound_branch_pairs {
+        if filter_bound(bound, *best) {
+            branch_and_bound(
+                flow_rates,
+                sorted_flow_rate_indices,
+                shortest_path_lengths,
+                branch,
+                best_for_visited,
+                best,
+                filter_bound,
+            );
+        }
+    }
 }
 
 #[aoc_generator(day16)]
-fn parse_valves(input: &str) -> HashMap<String, Valve> {
-    input
+fn parse_valves(input: &str) -> (Vec<usize>, Vec<Vec<u8>>, Vec<usize>, usize) {
+    let valves: Vec<Valve> = input
         .lines()
         .filter_map(|line| Valve::from_str(line).ok())
-        .map(move |valve| (valve.name.clone(), valve))
-        .collect()
+        .collect();
+
+    let adjacency_matrix = floyd_warshall(&valves);
+    let notable_valves = valves
+        .iter()
+        .enumerate()
+        .filter(|&(_, valve)| valve.name == "AA" || valve.rate > 0)
+        .map(|(i, _)| i)
+        .collect_vec();
+    let flow_rates = notable_valves.iter().map(|&i| valves[i].rate).collect_vec();
+    let shortest_lengths: Vec<Vec<_>> = notable_valves
+        .iter()
+        .map(|&i| {
+            notable_valves
+                .iter()
+                .map(|&j| adjacency_matrix[i][j])
+                .collect()
+        })
+        .collect();
+    let starting_node = notable_valves
+        .iter()
+        .position(|&i| valves[i].name == "AA")
+        .expect("No valve labeled AA");
+    let sorted_flow_rate_indices = flow_rates
+        .iter()
+        .enumerate()
+        .sorted_unstable_by_key(|&(_, &flow)| Reverse(flow))
+        .map(|(i, _)| i)
+        .collect_vec();
+    (
+        flow_rates,
+        shortest_lengths,
+        sorted_flow_rate_indices,
+        starting_node,
+    )
 }
 
 #[aoc(day16, part1)]
-fn part1_greedy(input: &HashMap<String, Valve>) -> usize {
-    let state = State::default();
-    let mut adjacency_matrix = initial_adjacency_matrix(&input);
-    fill_matrix(&input, &mut adjacency_matrix);
-    brute_search(&state, &input, &adjacency_matrix)
+fn part1_branch_and_bound(input: &(Vec<usize>, Vec<Vec<u8>>, Vec<usize>, usize)) -> usize {
+    let state = State::new(input.3, 30);
+    let mut best = 0;
+    branch_and_bound(
+        &input.0,
+        &input.2,
+        &input.1,
+        state,
+        &mut [],
+        &mut best,
+        |bound, best| bound > best,
+    );
+    best
 }
 
 #[cfg(test)]
 mod test {
-    use crate::day16::part1_greedy;
+    use crate::day16::part1_branch_and_bound;
 
-    use super::{fill_matrix, initial_adjacency_matrix, parse_valves, Valve};
+    use super::{parse_valves, Valve};
 
     const SAMPLE_INPUT: &str = "Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
 Valve BB has flow rate=13; tunnels lead to valves CC, AA
@@ -222,10 +279,10 @@ Valve JJ has flow rate=21; tunnel leads to valve II";
     }
 
     #[test]
-    fn sample_brute() {
-      let map = parse_valves(SAMPLE_INPUT);
-      let expected = 1651;
-      let actual = part1_greedy(&map);
-      assert_eq!(expected, actual);
+    fn sample_part1() {
+        let map = parse_valves(SAMPLE_INPUT);
+        let expected = 1651;
+        let actual = part1_branch_and_bound(&map);
+        assert_eq!(expected, actual);
     }
 }
