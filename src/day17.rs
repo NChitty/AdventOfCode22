@@ -162,6 +162,7 @@ fn simulate_pattern_recognition(directions: &[Direction], target: usize) -> usiz
     top + added_by_repeats
 }
 
+#[allow(dead_code)]
 fn print_chamber(chamber: &[u8]) {
     chamber.iter().rev().for_each(|row| {
         println!("|{:07b}|", row);
