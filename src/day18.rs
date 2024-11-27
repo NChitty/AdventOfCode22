@@ -1,12 +1,13 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fmt::Display,
     ops::Add,
     str::FromStr,
 };
 
 use itertools::Itertools;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 struct Position {
     x: isize,
     y: isize,
@@ -38,6 +39,24 @@ impl Add for Position {
             y: self.y + rhs.y,
             z: self.z + rhs.z,
         }
+    }
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.x, self.y, self.z)
+    }
+}
+
+impl Position {
+    fn in_bounds(&self, bounds: &[Self; 2]) -> bool {
+        let [min, max] = bounds;
+        self.x >= min.x - 1
+            && self.x <= max.x + 1
+            && self.y >= min.y + 1
+            && self.y <= max.y + 1
+            && self.z >= min.z + 1
+            && self.z <= max.z + 1
     }
 }
 
@@ -96,6 +115,32 @@ impl Delta {
     }
 }
 
+fn bounds(positions: &[Position]) -> [Position; 2] {
+    positions.iter().fold(
+        [
+            Position {
+                x: isize::MAX,
+                y: isize::MAX,
+                z: isize::MAX,
+            },
+            Position {
+                x: isize::MIN,
+                y: isize::MIN,
+                z: isize::MIN,
+            },
+        ],
+        |[mut min, mut max], cube| {
+            min.x = min.x.min(cube.x);
+            min.y = min.y.min(cube.y);
+            min.z = min.z.min(cube.z);
+            max.x = max.x.max(cube.x);
+            max.y = max.y.max(cube.y);
+            max.z = max.z.max(cube.z);
+            [min, max]
+        },
+    )
+}
+
 #[aoc_generator(day18)]
 fn to_positions(input: &str) -> Vec<Position> {
     input
@@ -105,7 +150,7 @@ fn to_positions(input: &str) -> Vec<Position> {
 }
 
 #[aoc(day18, part1)]
-fn count_visible_faces(positions: &[Position]) -> u32 {
+fn count_faces(positions: &[Position]) -> u32 {
     let mut position_visible_faces: HashMap<Position, u8> = HashMap::new();
     positions.iter().for_each(|position| {
         // insert
@@ -119,9 +164,11 @@ fn count_visible_faces(positions: &[Position]) -> u32 {
                 .and_modify(|val| *val &= !delta.mask());
             match entry {
                 Entry::Occupied(_) => {
-                  let cur_val = position_visible_faces.get_mut(position).expect("Could not get current position");
-                  *cur_val &= !delta.inverse().mask();
-                },
+                    let cur_val = position_visible_faces
+                        .get_mut(position)
+                        .expect("Could not get current position");
+                    *cur_val &= !delta.inverse().mask();
+                }
                 Entry::Vacant(_) => (),
             }
         }
@@ -132,11 +179,37 @@ fn count_visible_faces(positions: &[Position]) -> u32 {
         .sum()
 }
 
+#[aoc(day18, part2)]
+fn count_exposed_faces(positions: &[Position]) -> u32 {
+    let mut position_visible_faces: HashMap<Position, u8> =
+        positions.iter().map(|position| (*position, 0x00)).collect();
+    let bounds = bounds(positions);
+    // fix start position, as one of the neighbors must be within the bounds
+    let mut stack = vec![Position::default()];
+    let mut seen: HashSet<Position> = HashSet::new();
+    let mut exposed: HashSet<Position> = HashSet::new();
+    while let Some(position) = stack.pop() {
+        for delta in Delta::deltas() {
+            let neighbor = position + delta.delta_pos();
+            // filling "outside in"
+            // if the neighbor is part of the keys then update with the invertered direction and
+            // don't push
+            // else if successful insert to seen & within bounds, push to stack
+        }
+    }
+    position_visible_faces
+        .values()
+        .map(|byte| byte.count_ones())
+        .sum()
+}
+
 #[cfg(test)]
 mod test {
-    use super::{count_visible_faces, to_positions};
+    use crate::day18::count_exposed_faces;
 
-  const SAMPLE_INPUT: &str = "2,2,2
+    use super::{count_faces, to_positions};
+
+    const SAMPLE_INPUT: &str = "2,2,2
 1,2,2
 3,2,2
 2,1,2
@@ -150,11 +223,19 @@ mod test {
 2,1,5
 2,3,5";
 
-  #[test]
-  fn sample_part1() {
-    let positions = to_positions(SAMPLE_INPUT);
-    let expected = 64;
-    let actual = count_visible_faces(&positions);
-    assert_eq!(expected, actual);
-  }
+    #[test]
+    fn sample_part1() {
+        let positions = to_positions(SAMPLE_INPUT);
+        let expected = 64;
+        let actual = count_faces(&positions);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn sample_part2() {
+        let positions = to_positions(SAMPLE_INPUT);
+        let expected = 58;
+        let actual = count_exposed_faces(&positions);
+        assert_eq!(expected, actual);
+    }
 }
