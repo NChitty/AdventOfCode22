@@ -53,9 +53,9 @@ impl Position {
         let [min, max] = bounds;
         self.x >= min.x - 1
             && self.x <= max.x + 1
-            && self.y >= min.y + 1
+            && self.y >= min.y - 1
             && self.y <= max.y + 1
-            && self.z >= min.z + 1
+            && self.z >= min.z - 1
             && self.z <= max.z + 1
     }
 }
@@ -184,17 +184,18 @@ fn count_exposed_faces(positions: &[Position]) -> u32 {
     let mut position_visible_faces: HashMap<Position, u8> =
         positions.iter().map(|position| (*position, 0x00)).collect();
     let bounds = bounds(positions);
-    // fix start position, as one of the neighbors must be within the bounds
-    let mut stack = vec![Position::default()];
+    let mut stack = vec![bounds[0]];
     let mut seen: HashSet<Position> = HashSet::new();
-    let mut exposed: HashSet<Position> = HashSet::new();
     while let Some(position) = stack.pop() {
         for delta in Delta::deltas() {
             let neighbor = position + delta.delta_pos();
-            // filling "outside in"
-            // if the neighbor is part of the keys then update with the invertered direction and
-            // don't push
-            // else if successful insert to seen & within bounds, push to stack
+            if position_visible_faces.contains_key(&neighbor) {
+                *position_visible_faces.get_mut(&neighbor).unwrap() |= delta.inverse().mask();
+                continue;
+            }
+            if seen.insert(neighbor) && neighbor.in_bounds(&bounds) {
+                stack.push(neighbor);
+            }
         }
     }
     position_visible_faces
